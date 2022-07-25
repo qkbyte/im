@@ -17,12 +17,14 @@ import (
 	"Open_IM/pkg/utils"
 	"flag"
 	"fmt"
+
 	//_ "github.com/razeencheng/demo-go/swaggo-gin/docs"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"io"
 	"os"
 	"strconv"
+
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/gin-gonic/gin"
 	//"syscall"
