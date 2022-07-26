@@ -9,8 +9,8 @@ import (
 	"Open_IM/pkg/grpc-etcdv3/getcdv3"
 	cacheRpc "Open_IM/pkg/proto/cache"
 	pbCache "Open_IM/pkg/proto/cache"
-	pbChat "Open_IM/pkg/proto/chat"
 	pbConversation "Open_IM/pkg/proto/conversation"
+	pbChat "Open_IM/pkg/proto/msg"
 	pbRelay "Open_IM/pkg/proto/relay"
 	sdk_ws "Open_IM/pkg/proto/sdk_ws"
 	"Open_IM/pkg/utils"
@@ -191,7 +191,9 @@ func (rpc *rpcChat) SendMsg(_ context.Context, pb *pbChat.SendMsgReq) (*pbChat.S
 	if !flag {
 		return returnMsg(&replay, pb, errCode, errMsg, "", 0)
 	}
+	// 消息base64加密,明文：nihao你好123，加密后：bmloYW/kvaDlpb0xMjM=
 	rpc.encapsulateMsgData(pb.MsgData)
+	// 消息放入kafka消息队列
 	msgToMQSingle := pbChat.MsgDataToMQ{Token: pb.Token, OperationID: pb.OperationID, MsgData: pb.MsgData}
 	// callback
 	callbackResp := callbackWordFilter(pb)
@@ -331,8 +333,8 @@ func (rpc *rpcChat) SendMsg(_ context.Context, pb *pbChat.SendMsgReq) (*pbChat.S
 			}
 		}
 		log.Debug(pb.OperationID, "send msg cost time22 ", db.GetCurrentTimestampByMill()-newTime, pb.MsgData.ClientMsgID, "uidList : ", len(addUidList))
-		wg.Add(1)
-		go rpc.sendMsgToGroup(addUidList, *pb, constant.OnlineStatus, &sendTag, &wg)
+		//wg.Add(1)
+		//go rpc.sendMsgToGroup(addUidList, *pb, constant.OnlineStatus, &sendTag, &wg)
 		wg.Wait()
 		newTime = db.GetCurrentTimestampByMill()
 		// callback
@@ -830,14 +832,14 @@ func Notification(n *NotificationMsg) {
 	offlineInfo.Ex = ex
 	msg.OfflinePushInfo = &offlineInfo
 	req.MsgData = &msg
-	etcdConn := getcdv3.GetConn(config.Config.Etcd.EtcdSchema, strings.Join(config.Config.Etcd.EtcdAddr, ","), config.Config.RpcRegisterName.OpenImOfflineMessageName, req.OperationID)
+	etcdConn := getcdv3.GetConn(config.Config.Etcd.EtcdSchema, strings.Join(config.Config.Etcd.EtcdAddr, ","), config.Config.RpcRegisterName.OpenImMsgName, req.OperationID)
 	if etcdConn == nil {
 		errMsg := req.OperationID + "getcdv3.GetConn == nil"
 		log.NewError(req.OperationID, errMsg)
 		return
 	}
 
-	client := pbChat.NewChatClient(etcdConn)
+	client := pbChat.NewMsgClient(etcdConn)
 	reply, err := client.SendMsg(context.Background(), &req)
 	if err != nil {
 		log.NewError(req.OperationID, "SendMsg rpc failed, ", req.String(), err.Error())
@@ -853,9 +855,9 @@ func getOnlineAndOfflineUserIDList(memberList []string, m map[string][]string, o
 	req.OperationID = operationID
 	req.OpUserID = config.Config.Manager.AppManagerUid[0]
 	flag := false
-	grpcCons := getcdv3.GetConn4Unique(config.Config.Etcd.EtcdSchema, strings.Join(config.Config.Etcd.EtcdAddr, ","), config.Config.RpcRegisterName.OpenImOnlineMessageRelayName)
+	grpcCons := getcdv3.GetConn4Unique(config.Config.Etcd.EtcdSchema, strings.Join(config.Config.Etcd.EtcdAddr, ","), config.Config.RpcRegisterName.OpenImRelayName)
 	for _, v := range grpcCons {
-		client := pbRelay.NewOnlineMessageRelayServiceClient(v)
+		client := pbRelay.NewRelayClient(v)
 		reply, err := client.GetUsersOnlineStatus(context.Background(), req)
 		if err != nil {
 			log.NewError(operationID, "GetUsersOnlineStatus rpc  err", req.String(), err.Error())
